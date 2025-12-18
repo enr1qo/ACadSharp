@@ -1,16 +1,42 @@
 ﻿using ACadSharp.IO;
 using ACadSharp.Tables;
 using ACadSharp.Tables.Collections;
+
 using System;
+using System.Collections.Generic;
 using System.Linq;
+using ACadSharp.Entities;
+using ACadSharp.Objects.Evaluations;
+using CSMath;
 
 namespace ACadSharp.Examples
 {
 	class Program
 	{
-		const string _file = "../../../../../samples/sample_AC1032.dwg";
+		private const string _file = "C:\\Users\\panchukvv\\Documents\\test_dyn_insert.dwg";
 
-		static void Main(string[] args)
+		const string _dynBlockName = "FSA_Heater_W";
+
+		//const string _dynBlockName = "CircleOrSquare";
+		private static List<String> _visibilitis = new List<String>()
+		{
+			"0",
+			"FS",
+			"PS"
+			//"circle",
+			//"square"
+		};
+
+		private static List<XYZ> _insertPoints = new List<XYZ>()
+		{
+			new XYZ(0, 0, 0),
+			new XYZ(150, 0, 0),
+			new XYZ(300, 0, 0)
+		};
+
+		private const string _dinName = "SensorTypeIn";
+
+		static void Main( string[] args )
 		{
 			CadDocument doc;
 			DwgPreview preview;
@@ -18,9 +44,29 @@ namespace ACadSharp.Examples
 			{
 				doc = reader.Read();
 				preview = reader.ReadPreview();
+
+				var blockRecord = doc.BlockRecords[_dynBlockName];
+				BlockVisibilityParameter dynamicBLock = null;
+				if (blockRecord.XDictionary != null && blockRecord.XDictionary.EntryNames.Contains("ACAD_ENHANCEDBLOCK"))
+				{
+					var enhancedBlock = blockRecord.XDictionary["ACAD_ENHANCEDBLOCK"] as EvaluationGraph;
+					if (enhancedBlock != null && enhancedBlock is EvaluationGraph)
+					{
+						foreach (EvaluationGraph.Node node in enhancedBlock.Nodes)
+						{
+							if (node.Expression is BlockVisibilityParameter)
+							{
+								dynamicBLock = (BlockVisibilityParameter)node.Expression;
+								break;
+							}
+						}
+					}
+				}
 			}
 
-			exploreDocument(doc);
+			//exploreDocument(doc);
+
+			Console.ReadKey();
 		}
 
 		/// <summary>
