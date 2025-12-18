@@ -41,6 +41,24 @@ namespace ACadSharp.Entities
 		/// <inheritdoc/>
 		public override string SubclassMarker => DxfSubclassMarker.Arc;
 
+		/// <summary>
+		/// Sweep of the arc, in radians.
+		/// </summary>
+		public double Sweep
+		{
+			get
+			{
+				double start = this.StartAngle;
+				double end = this.EndAngle;
+				if (end < start)
+				{
+					end += MathHelper.TwoPI;
+				}
+
+				return start - end;
+			}
+		}
+
 		/// <inheritdoc/>
 		public Arc() : base() { }
 
@@ -126,9 +144,7 @@ namespace ACadSharp.Entities
 		/// <inheritdoc/>
 		public override void ApplyTransform(Transform transform)
 		{
-			var center = this.Center;
 			var normal = this.Normal;
-			var radius = this.Radius;
 
 			base.ApplyTransform(transform);
 
@@ -204,15 +220,13 @@ namespace ACadSharp.Entities
 				throw new ArgumentOutOfRangeException(nameof(precision), precision, "The arc precision must be equal or greater than two.");
 			}
 
-			this.GetEndVertices(out XYZ start, out XYZ end);
-
 			return CurveExtensions.PolygonalVertexes(
 				precision,
 				this.Center,
 				this.StartAngle,
 				this.EndAngle,
 				this.Radius,
-				this.Normal
+				this.Normal.Normalize()
 			);
 		}
 	}

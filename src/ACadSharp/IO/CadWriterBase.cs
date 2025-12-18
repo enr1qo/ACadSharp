@@ -2,7 +2,6 @@
 using System.Text;
 using System;
 using System.IO;
-using ACadSharp.Classes;
 using System.Linq;
 using ACadSharp.Entities;
 using ACadSharp.Tables;
@@ -41,6 +40,8 @@ namespace ACadSharp.IO
 		/// <inheritdoc/>
 		public virtual void Write()
 		{
+			this._document.UpdateImageReactors();
+
 			this._document.UpdateDxfClasses(this.Configuration.ResetDxfClasses);
 
 			if (this.Configuration.UpdateDimensionsInModel)

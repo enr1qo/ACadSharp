@@ -33,15 +33,6 @@ namespace ACadSharp.Entities
 		public double EndParameter { get; set; } = MathHelper.TwoPI;
 
 		/// <summary>
-		/// Endpoint of major axis, relative to the center (in WCS).
-		/// </summary>
-		/// <remarks>
-		/// Axis X is set as default.
-		/// </remarks>
-		[DxfCodeValue(11, 21, 31)]
-		public XYZ MajorAxisEndPoint { get; set; } = XYZ.AxisX;
-
-		/// <summary>
 		/// Flag that indicates weather this ellipse is closed or not.
 		/// </summary>
 		public bool IsFullEllipse { get { return this.StartParameter == 0 && this.EndParameter == MathHelper.TwoPI; } }
@@ -50,6 +41,15 @@ namespace ACadSharp.Entities
 		/// Length of the major axis.
 		/// </summary>
 		public double MajorAxis { get { return 2 * this.MajorAxisEndPoint.GetLength(); } }
+
+		/// <summary>
+		/// Endpoint of major axis, relative to the center (in WCS).
+		/// </summary>
+		/// <remarks>
+		/// Axis X is set as default.
+		/// </remarks>
+		[DxfCodeValue(11, 21, 31)]
+		public XYZ MajorAxisEndPoint { get; set; } = XYZ.AxisX;
 
 		/// <summary>
 		/// Length of the minor axis.
@@ -136,16 +136,24 @@ namespace ACadSharp.Entities
 			perp *= this.MajorAxisEndPoint.GetLength() * this.RadiusRatio;
 
 			this.Center = transform.ApplyTransform(this.Center);
-			this.MajorAxisEndPoint = transform.ApplyTransform(this.MajorAxisEndPoint);
+			this.MajorAxisEndPoint = transform.ApplyScale(this.MajorAxisEndPoint);
+
 			XYZ newPrep = transform.ApplyTransform(perp);
 			if (newPrep != XYZ.Zero && this.MajorAxisEndPoint != XYZ.Zero)
 			{
-				this.RadiusRatio = newPrep.GetLength() / this.MajorAxisEndPoint.GetLength();
-				this.Normal = XYZ.Cross(this.MajorAxisEndPoint, newPrep);
+				var ratio = newPrep.GetLength() / this.MajorAxisEndPoint.GetLength();
+				if (ratio > 1)
+				{
+					ratio = this.RadiusRatio;
+				}
+
+				this.RadiusRatio = ratio;
+
+				this.Normal = XYZ.Cross(newPrep, this.MajorAxisEndPoint).Normalize();
 			}
 			else
 			{
-				this.Normal = transform.ApplyTransform(this.Normal);
+				this.Normal = this.transformNormal(transform, this.Normal);
 			}
 		}
 
@@ -154,6 +162,17 @@ namespace ACadSharp.Entities
 		{
 			List<XYZ> pts = this.PolygonalVertexes(100);
 			return BoundingBox.FromPoints(pts);
+		}
+
+		/// <summary>
+		/// Get end vertices of the ellipse, if <see cref="IsFullEllipse"/> is set, the point will be the same.
+		/// </summary>
+		/// <param name="start"></param>
+		/// <param name="end"></param>
+		public void GetEndVertices(out XYZ start, out XYZ end)
+		{
+			start = this.PolarCoordinateRelativeToCenter(this.StartParameter);
+			end = this.PolarCoordinateRelativeToCenter(this.EndParameter);
 		}
 
 		/// <inheritdoc/>

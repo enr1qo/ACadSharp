@@ -1,4 +1,5 @@
 ﻿using ACadSharp.Attributes;
+using ACadSharp.Extensions;
 using ACadSharp.Objects;
 using ACadSharp.Tables;
 using CSMath;
@@ -207,7 +208,7 @@ namespace ACadSharp.Entities
 			{
 				if (this.Document != null)
 				{
-					this._scale = this.updateCollection(value, this.Document.Scales);
+					this._scale = updateCollection(value, this.Document.Scales);
 				}
 				else
 				{
@@ -392,8 +393,15 @@ namespace ACadSharp.Entities
 		{
 			Viewport clone = (Viewport)base.Clone();
 
+			clone.Boundary = (Entity)this.Boundary?.Clone();
 			clone.VisualStyle = (VisualStyle)this.VisualStyle?.Clone();
 			clone._scale = (Scale)this.Scale?.Clone();
+
+			clone.FrozenLayers = new List<Layer>();
+			foreach (var item in this.FrozenLayers)
+			{
+				clone.FrozenLayers.Add(item.CloneTyped());
+			}
 
 			return clone;
 		}
@@ -441,12 +449,12 @@ namespace ACadSharp.Entities
 
 			return entities;
 		}
-		
+
 		internal override void AssignDocument(CadDocument doc)
 		{
 			base.AssignDocument(doc);
 
-			this._scale = this.updateCollection(this._scale, doc.Scales);
+			this._scale = updateCollection(this._scale, doc.Scales);
 
 			this.Document.Scales.OnRemove += this.scalesOnRemove;
 		}

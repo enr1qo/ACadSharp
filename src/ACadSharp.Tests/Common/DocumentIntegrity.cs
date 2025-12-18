@@ -1,5 +1,6 @@
 ﻿using ACadSharp.Entities;
 using ACadSharp.Objects;
+using ACadSharp.Objects.Collections;
 using ACadSharp.Tables;
 using ACadSharp.Tables.Collections;
 using ACadSharp.Tests.TestModels;
@@ -62,10 +63,12 @@ namespace ACadSharp.Tests.Common
 
 			//Assert Model layout
 			var layout = doc.Layouts.FirstOrDefault(l => l.Name == Layout.ModelLayoutName);
-
 			this.notNull(layout, "Layout Model is null");
-
 			Assert.True(layout.AssociatedBlock == doc.ModelSpace);
+
+			this.entryNotNull(doc.Materials, "Global");
+			this.entryNotNull(doc.Materials, "ByLayer");
+			this.entryNotNull(doc.Materials, "ByBlock");
 		}
 
 		public void AssertBlockRecords(CadDocument doc)
@@ -215,7 +218,6 @@ namespace ACadSharp.Tests.Common
 							//The dynamic block instance for tables are generated on the spot and not saved.
 							break;
 						}
-
 						this.assertCollectionTree(record.Entities, blockRecordNode.Entities);
 						break;
 					case Layer layer when child is LayerNode layerNode:
@@ -255,7 +257,7 @@ namespace ACadSharp.Tests.Common
 
 			//Assert.Equal(entity.Transparency, node.Transparency);
 			Assert.Equal(entity.LineType.Name, node.LinetypeName, ignoreCase: true);
-			Assert.Equal(entity.LinetypeScale, node.LinetypeScale);
+			Assert.Equal(entity.LineTypeScale, node.LinetypeScale);
 
 			if (this._document.Header.Version > ACadVersion.AC1014)
 			{
@@ -267,6 +269,9 @@ namespace ACadSharp.Tests.Common
 			{
 				case Dimension dim:
 					assertDimensionProperties(dim, node);
+					break;
+				case IPolyline pline:
+					Assert.True(pline.Vertices.Any());
 					break;
 			}
 		}
@@ -333,6 +338,14 @@ namespace ACadSharp.Tests.Common
 		{
 			var record = table[entry];
 			Assert.True(record != null, $"Entry with name {entry} is null for table {table}");
+			Assert.NotNull(record.Document);
+		}
+
+		private void entryNotNull<T>(ObjectDictionaryCollection<T> table, string entry)
+			where T : NonGraphicalObject
+		{
+			var record = table[entry];
+			Assert.True(record != null, $"Entry with name {entry} is null for dictionary {table}");
 			Assert.NotNull(record.Document);
 		}
 	}

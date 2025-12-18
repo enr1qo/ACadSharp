@@ -1,11 +1,9 @@
-﻿using ACadSharp.Blocks;
-using ACadSharp.Entities;
+﻿using ACadSharp.Entities;
 using ACadSharp.Extensions;
 using ACadSharp.Objects;
 using ACadSharp.Tables;
 using ACadSharp.XData;
 using CSMath;
-using CSUtilities.Extensions;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -22,18 +20,14 @@ namespace ACadSharp.Tests.IO
 		static WriterSingleObjectTests()
 		{
 			Data = new();
-			if (!TestVariables.RunDwgWriterSingleCases)
-			{
-				Data.Add(new(nameof(SingleCaseGenerator.Empty)));
-				return;
-			}
-
 			Data.Add(new(nameof(SingleCaseGenerator.Empty)));
 			Data.Add(new(nameof(SingleCaseGenerator.ArcSegments)));
 			Data.Add(new(nameof(SingleCaseGenerator.SingleEllipse)));
 			Data.Add(new(nameof(SingleCaseGenerator.SingleLine)));
 			Data.Add(new(nameof(SingleCaseGenerator.ViewZoom)));
+			Data.Add(new(nameof(SingleCaseGenerator.SingleMLeader)));
 			Data.Add(new(nameof(SingleCaseGenerator.SingleMLine)));
+			Data.Add(new(nameof(SingleCaseGenerator.EllipseSegments)));
 			Data.Add(new(nameof(SingleCaseGenerator.EntityColorByLayer)));
 			Data.Add(new(nameof(SingleCaseGenerator.EntityColorTrueColor)));
 			Data.Add(new(nameof(SingleCaseGenerator.EntityChangeNormal)));
@@ -47,18 +41,19 @@ namespace ACadSharp.Tests.IO
 			Data.Add(new(nameof(SingleCaseGenerator.SingleMTextRotation)));
 			Data.Add(new(nameof(SingleCaseGenerator.SingleMTextSpecialCharacter)));
 			Data.Add(new(nameof(SingleCaseGenerator.TextWithChineseCharacters)));
-			Data.Add(new(nameof(SingleCaseGenerator.TextAlignment)));
 			Data.Add(new(nameof(SingleCaseGenerator.CreateGroup)));
 			Data.Add(new(nameof(SingleCaseGenerator.SingleMTextMultiline)));
 			Data.Add(new(nameof(SingleCaseGenerator.SinglePoint)));
 			Data.Add(new(nameof(SingleCaseGenerator.ClosedLwPolyline)));
 			Data.Add(new(nameof(SingleCaseGenerator.ClosedPolyline2DTest)));
+			Data.Add(new(nameof(SingleCaseGenerator.ClosedPolyline3DTest)));
 			Data.Add(new(nameof(SingleCaseGenerator.SinglePdfUnderlay)));
 			Data.Add(new(nameof(SingleCaseGenerator.SingleRasterImage)));
 			Data.Add(new(nameof(SingleCaseGenerator.SingleWipeout)));
 			Data.Add(new(nameof(SingleCaseGenerator.CreateLayout)));
 			Data.Add(new(nameof(SingleCaseGenerator.EntityTransparency)));
 			Data.Add(new(nameof(SingleCaseGenerator.LineTypeWithSegments)));
+			Data.Add(new(nameof(SingleCaseGenerator.LineTypeWithTextSegment)));
 			Data.Add(new(nameof(SingleCaseGenerator.CreateInsertWithHatch)));
 			Data.Add(new(nameof(SingleCaseGenerator.InsertWithSpatialFilter)));
 			Data.Add(new(nameof(SingleCaseGenerator.CreateHatchPolyline)));
@@ -82,6 +77,7 @@ namespace ACadSharp.Tests.IO
 			Data.Add(new(nameof(SingleCaseGenerator.TextAlignment)));
 			Data.Add(new(nameof(SingleCaseGenerator.LineTypeInBlock)));
 			Data.Add(new(nameof(SingleCaseGenerator.XData)));
+			Data.Add(new(nameof(SingleCaseGenerator.XRef)));
 			Data.Add(new(nameof(SingleCaseGenerator.SPlineCreation)));
 			Data.Add(new(nameof(SingleCaseGenerator.CreateXRecords)));
 		}
@@ -99,7 +95,14 @@ namespace ACadSharp.Tests.IO
 		{
 			public CadDocument Document { get; private set; } = new CadDocument();
 
+			/// <summary>
+			/// Gets a value indicating whether the operation has been executed.
+			/// </summary>
+			public bool HasExecuted { get; private set; }
+
 			public string Name { get; private set; }
+
+			public Stream Stream { get; set; }
 
 			public SingleCaseGenerator()
 			{
@@ -194,6 +197,128 @@ namespace ACadSharp.Tests.IO
 				this.Document.Scales.Add(new Scale("Hello"));
 			}
 
+			public void ArcSegments()
+			{
+				Arc arc = new Arc()
+				{
+					Center = new XYZ(100, 0, 0),
+					Radius = 50,
+					StartAngle = MathHelper.HalfPI,
+					EndAngle = Math.PI,
+				};
+
+				XYZ start = new XYZ(100, 50, 0);
+				XYZ end = new XYZ(50, 0, 0);
+
+				var v = arc.PolygonalVertexes(3);
+
+				Polyline3D polyline = new Polyline3D(v.Select(a => new Vertex3D(a)), false);
+				polyline.Color = Color.Red;
+
+				arc.GetEndVertices(out XYZ s, out XYZ e);
+
+				this.Document.Entities.Add(arc);
+				this.Document.Entities.Add(polyline);
+
+				//Inverted normal
+				arc = new Arc()
+				{
+					Center = new XYZ(0, 0, 0),
+					Radius = 50,
+					StartAngle = MathHelper.HalfPI,
+					EndAngle = Math.PI,
+					Normal = new XYZ(0, 0, -1)
+				};
+
+				arc.GetEndVertices(out s, out e);
+				Line l = new Line(s, e);
+
+				v = arc.PolygonalVertexes(3);
+				polyline = new Polyline3D(v.Select(a => new Vertex3D(a)), false);
+				//polyline.Normal = new XYZ(0, 0, -1);
+				polyline.Color = Color.Green;
+
+				this.Document.Entities.Add(arc);
+				this.Document.Entities.Add(polyline);
+				this.Document.Entities.Add(l);
+
+				arc = new Arc()
+				{
+					StartAngle = 0,
+					EndAngle = Math.PI / (2),
+					Radius = 20,
+					Normal = XYZ.AxisX
+				};
+
+				v = arc.PolygonalVertexes(3);
+				polyline = new Polyline3D(v.Select(a => new Vertex3D(a)), false);
+				polyline.Color = Color.Blue;
+
+				arc.GetEndVertices(out s, out e);
+				l = new Line(s, e);
+
+				this.Document.Entities.Add(arc);
+				this.Document.Entities.Add(polyline);
+				this.Document.Entities.Add(l);
+
+				arc = new Arc()
+				{
+					StartAngle = 0,
+					EndAngle = Math.PI / (2),
+					Radius = 20,
+					Normal = -XYZ.AxisX
+				};
+
+				v = arc.PolygonalVertexes(3);
+				polyline = new Polyline3D(v.Select(a => new Vertex3D(a)), false);
+				polyline.Color = Color.Yellow;
+
+				arc.GetEndVertices(out s, out e);
+				l = new Line(s, e);
+
+				this.Document.Entities.Add(arc);
+				this.Document.Entities.Add(polyline);
+				this.Document.Entities.Add(l);
+
+				arc = new Arc()
+				{
+					StartAngle = 0,
+					EndAngle = Math.PI / (2),
+					Radius = 20,
+					Normal = XYZ.AxisY
+				};
+
+				v = arc.PolygonalVertexes(3);
+				polyline = new Polyline3D(v.Select(a => new Vertex3D(a)), false);
+				polyline.Color = Color.Magenta;
+
+				arc.GetEndVertices(out s, out e);
+				l = new Line(s, e);
+
+				this.Document.Entities.Add(arc);
+				this.Document.Entities.Add(polyline);
+				this.Document.Entities.Add(l);
+
+				arc = new Arc()
+				{
+					StartAngle = 0,
+					EndAngle = Math.PI / (2),
+					Radius = 20,
+					Normal = -XYZ.AxisY
+				};
+
+				v = arc.PolygonalVertexes(3);
+				polyline = new Polyline3D(v.Select(a => new Vertex3D(a)), false);
+				polyline.Color = Color.Cyan;
+
+				arc.GetEndVertices(out s, out e);
+				l = new Line(s, e);
+
+				this.Document.Entities.Add(arc);
+				this.Document.Entities.Add(polyline);
+				this.Document.Entities.Add(l);
+			}
+
 			public void ChangedEncoding()
 			{
 				this.Document.Header.CodePage = "gb2312";
@@ -240,6 +365,25 @@ namespace ACadSharp.Tests.IO
 				this.Document.Entities.Add(pline);
 			}
 
+			public void ClosedPolyline3DTest()
+			{
+				List<Vertex3D> vector2d = new()
+				{
+					new Vertex3D() { Location = new XYZ(0, 0, 0) },
+					new Vertex3D() { Location = new XYZ(1, 0, 0) },
+					new Vertex3D() { Location = new XYZ(2, 1, 0) },
+					new Vertex3D() { Location = new XYZ(3, 1, 0) },
+					new Vertex3D() { Location = new XYZ(4, 4, 0) }
+				};
+
+				var pline = new Polyline3D();
+				pline.Vertices.AddRange(vector2d);
+				pline.IsClosed = true;
+				pline.Vertices.ElementAt(3).Bulge = 1;
+
+				this.Document.Entities.Add(pline);
+			}
+
 			public void CreateCircleHatch()
 			{
 				Hatch hatch = new Hatch();
@@ -273,29 +417,6 @@ namespace ACadSharp.Tests.IO
 				hatch.Paths.Add(path1);
 
 				this.Document.Entities.Add(hatch);
-			}
-
-			public void ArcSegments()
-			{
-				Arc arc = new Arc()
-				{
-					Center = new XYZ(100, 0, 0),
-					Radius = 50,
-					StartAngle = MathHelper.HalfPI,
-					EndAngle = Math.PI,
-				};
-
-				XYZ start = new XYZ(100, 50, 0);
-				XYZ end = new XYZ(50, 0, 0);
-
-				var v = arc.PolygonalVertexes(3);
-
-				Polyline2D polyline = new Polyline2D(v.Select(a => new Vertex2D(a)), false);
-
-				arc.GetEndVertices(out XYZ s, out XYZ e);
-
-				this.Document.Entities.Add(arc);
-				this.Document.Entities.Add(polyline);
 			}
 
 			public void CreateGroup()
@@ -401,7 +522,7 @@ namespace ACadSharp.Tests.IO
 				pline.Vertices.Add(new XYZ(0, 0, 0));
 
 				path.Edges.Add(pline);
-				path.Flags = path.Flags.AddFlag(BoundaryPathFlags.Polyline);
+				path.Flags |= BoundaryPathFlags.Polyline;
 				hatch.Paths.Add(path);
 
 				this.Document.Entities.Add(hatch);
@@ -433,37 +554,11 @@ namespace ACadSharp.Tests.IO
 					Flags = BoundaryPathFlags.External,
 				};
 
-				path.Edges.Add(new Hatch.BoundaryPath.Polyline()
-				{
-					Vertices = [new(0, 0, 0), new(0, 5, 0), new(5, 5, 0), new(5, 0, 0)],
-					IsClosed = true,
-				});
+				path.Edges.Add(new Hatch.BoundaryPath.Polyline([new(0, 0, 0), new(0, 5, 0), new(5, 5, 0), new(5, 0, 0)]));
 
 				hatch.Paths.Add(path);
 
 				blockRecord.Entities.Add(hatch);
-			}
-
-			public void InsertWithSpatialFilter()
-			{
-				string blockName = Guid.NewGuid().ToString();
-				var blockRecord = new BlockRecord("my_block");
-				var insert = new Insert(blockRecord);
-
-				SpatialFilter filter = new SpatialFilter();
-				filter.BoundaryPoints.Add(XY.Zero);
-				filter.BoundaryPoints.Add(new XY(50, 50));
-				filter.DisplayBoundary = true;
-
-				insert.SpatialFilter = filter;
-
-				this.Document.Entities.Add(insert);
-
-				Circle circle = new Circle
-				{
-					Radius = 20
-				};
-				blockRecord.Entities.Add(circle);
 			}
 
 			public void CreateLayout()
@@ -517,7 +612,15 @@ namespace ACadSharp.Tests.IO
 			public void Deserialize(IXunitSerializationInfo info)
 			{
 				this.Name = info.GetValue<string>(nameof(this.Name));
-				this.GetType().GetMethod(this.Name).Invoke(this, null);
+				try
+				{
+					this.GetType().GetMethod(this.Name).Invoke(this, null);
+					this.HasExecuted = true;
+				}
+				catch
+				{
+					this.HasExecuted = false;
+				}
 			}
 
 			public void DimensionAligned()
@@ -723,6 +826,63 @@ namespace ACadSharp.Tests.IO
 				this.Document.Entities.Add(dim);
 			}
 
+			public void EllipseSegments()
+			{
+				XYZ center = new XYZ(5, 5, 0);
+
+				Ellipse ellipse = new Ellipse();
+				ellipse.RadiusRatio = 0.5d;
+				ellipse.StartParameter = 0.0d;
+				ellipse.EndParameter = Math.PI * 2;
+				ellipse.Center = center;
+
+				var pline = new Polyline3D(ellipse.PolygonalVertexes(4));
+				pline.Color = Color.Green;
+
+				this.Document.Entities.Add(pline);
+				this.Document.Entities.Add(ellipse);
+
+				ellipse = new Ellipse();
+				ellipse.RadiusRatio = 0.5d;
+				ellipse.StartParameter = 0.0d;
+				ellipse.EndParameter = Math.PI * 2;
+				ellipse.Normal = XYZ.AxisY;
+				ellipse.Center = center;
+
+				pline = new Polyline3D(ellipse.PolygonalVertexes(4));
+				pline.Color = Color.Red;
+
+				this.Document.Entities.Add(pline);
+				this.Document.Entities.Add(ellipse);
+
+				ellipse = new Ellipse();
+				ellipse.RadiusRatio = 0.5d;
+				ellipse.StartParameter = 0.0d;
+				ellipse.EndParameter = Math.PI * 2;
+				ellipse.MajorAxisEndPoint = XYZ.AxisY;
+				ellipse.Normal = XYZ.AxisX;
+				ellipse.Center = center;
+
+				pline = new Polyline3D(ellipse.PolygonalVertexes(4));
+				pline.Color = Color.Cyan;
+
+				this.Document.Entities.Add(pline);
+				this.Document.Entities.Add(ellipse);
+
+				ellipse = new Ellipse();
+				ellipse.RadiusRatio = 0.5d;
+				ellipse.StartParameter = 0.0d;
+				ellipse.EndParameter = Math.PI * 2;
+				ellipse.Center = center;
+				ellipse.Normal = -XYZ.AxisZ;
+
+				pline = new Polyline3D(ellipse.PolygonalVertexes(4));
+				pline.Color = Color.Blue;
+
+				this.Document.Entities.Add(pline);
+				this.Document.Entities.Add(ellipse);
+			}
+
 			public void Empty()
 			{ }
 
@@ -744,7 +904,9 @@ namespace ACadSharp.Tests.IO
 					Normal = XYZ.AxisX
 				};
 
-				foreach (XYZ item in arc.PolygonalVertexes(100))
+				var lst = arc.PolygonalVertexes(100);
+				var pline = new Polyline3D(lst);
+				foreach (XYZ item in lst)
 				{
 					this.Document.Entities.Add(new Circle()
 					{
@@ -755,6 +917,7 @@ namespace ACadSharp.Tests.IO
 				}
 
 				this.Document.Entities.Add(arc);
+				this.Document.Entities.Add(pline);
 			}
 
 			public void EntityColorByIndex()
@@ -809,6 +972,28 @@ namespace ACadSharp.Tests.IO
 				geodata.HostBlock = this.Document.ModelSpace;
 
 				this.Document.ModelSpace.XDictionary.Add(CadDictionary.GeographicData, geodata);
+			}
+
+			public void InsertWithSpatialFilter()
+			{
+				string blockName = Guid.NewGuid().ToString();
+				var blockRecord = new BlockRecord("my_block");
+				var insert = new Insert(blockRecord);
+
+				SpatialFilter filter = new SpatialFilter();
+				filter.BoundaryPoints.Add(XY.Zero);
+				filter.BoundaryPoints.Add(new XY(50, 50));
+				filter.DisplayBoundary = true;
+
+				insert.SpatialFilter = filter;
+
+				this.Document.Entities.Add(insert);
+
+				Circle circle = new Circle
+				{
+					Radius = 20
+				};
+				blockRecord.Entities.Add(circle);
 			}
 
 			public void LayerTrueColor()
@@ -877,6 +1062,94 @@ namespace ACadSharp.Tests.IO
 				this.Document.LineTypes.Add(lt);
 			}
 
+			public void LineTypeWithTextSegment()
+			{
+				LineType lt1 = new LineType("segmentedWithText")
+				{
+					Description = "hello text"
+				};
+
+				LineType.Segment lt1s1 = new LineType.Segment
+				{
+					Length = 5,
+					//Style = this.Document.TextStyles[TextStyle.DefaultName]
+				};
+
+				LineType.Segment lt1s2 = new LineType.Segment
+				{
+					Text = "Text",
+					Length = -3.0,
+					IsText = true,
+					Offset = new XY(-2.8, -.5),
+					Style = this.Document.TextStyles[TextStyle.DefaultName]
+				};
+
+				LineType.Segment lt1s3 = new LineType.Segment
+				{
+					Length = -.350,
+					//Style = this.Document.TextStyles[TextStyle.DefaultName]
+				};
+
+				lt1.AddSegment(lt1s1);
+				lt1.AddSegment(lt1s2);
+				lt1.AddSegment(lt1s3);
+
+
+				LineType lt2 = new LineType("degrees")
+				{
+					Description = "degree symbol",
+					Segments = { }
+				};
+
+
+				TextStyle style = new TextStyle("custom");
+
+				//this.Document.Header.CodePage = "GB2312";
+				style.Filename = "romans.shx";
+				style.BigFontFilename = "chineset.shx";
+				this.Document.TextStyles.Add(style);
+
+				LineType.Segment lt2s1 = new LineType.Segment
+				{
+					Length = 5,
+					//Style = this.Document.TextStyles[TextStyle.DefaultName]
+				};
+
+				LineType.Segment lt2s2 = new LineType.Segment
+				{
+					Text = "信",
+					Length = -3.0,
+					IsText = true,
+					Offset = new XY(-2.8, -.5),
+					Style = style
+				};
+
+				LineType.Segment lt2s3 = new LineType.Segment
+				{
+					Length = -.350,
+					//Style = this.Document.TextStyles[TextStyle.DefaultName]
+				};
+
+				lt2.AddSegment(lt2s1);
+				lt2.AddSegment(lt2s2);
+				lt2.AddSegment(lt2s3);
+
+				this.Document.LineTypes.Add(lt1);
+				this.Document.LineTypes.Add(lt2);
+
+				var line1 = new Line(new XYZ(0, 0, 0), new XYZ(20, 0, 0))
+				{
+					LineType = lt1
+				};
+
+				var line2 = new Line(new XYZ(0, 0, 0), new XYZ(0, 20, 0))
+				{
+					LineType = lt2
+				};
+				this.Document.Entities.Add(line1);
+				this.Document.Entities.Add(line2);
+			}
+
 			public void Serialize(IXunitSerializationInfo info)
 			{
 				info.AddValue(nameof(this.Name), this.Name);
@@ -897,6 +1170,32 @@ namespace ACadSharp.Tests.IO
 				Line line = new Line(XYZ.Zero, new XYZ(100, 100, 0));
 
 				this.Document.Entities.Add(line);
+			}
+
+			public void SingleMLeader()
+			{
+				MultiLeader mleader = new MultiLeader();
+				mleader.PathType = MultiLeaderPathType.StraightLineSegments;
+				mleader.PropertyOverrideFlags = MultiLeaderPropertyOverrideFlags.ContentType | MultiLeaderPropertyOverrideFlags.TextAlignment | MultiLeaderPropertyOverrideFlags.EnableUseDefaultMText;
+
+				mleader.ContextData.ContentBasePoint = new XYZ(1.8599999999999999, 1.5, 0);
+				mleader.ContextData.BasePoint = new XYZ(0, 0, 0);
+				mleader.ContextData.TextLabel = "This is my test MLEader";
+
+				var root = new MultiLeaderObjectContextData.LeaderRoot
+				{
+					ConnectionPoint = new XYZ(1.5, 1.5, 0),
+					ContentValid = true,
+					Direction = XYZ.AxisX,
+					LandingDistance = 0.36,
+				};
+				MultiLeaderObjectContextData.LeaderLine leaderLine = new MultiLeaderObjectContextData.LeaderLine();
+				leaderLine.PathType = MultiLeaderPathType.StraightLineSegments;
+				leaderLine.Points.Add(XYZ.Zero);
+				root.Lines.Add(leaderLine);
+				mleader.ContextData.LeaderRoots.Add(root);
+
+				this.Document.Entities.Add(mleader);
 			}
 
 			public void SingleMLine()
@@ -976,11 +1275,6 @@ namespace ACadSharp.Tests.IO
 				this.Document.Entities.Add(mtext);
 			}
 
-			public void SinglePoint()
-			{
-				this.Document.Entities.Add(new Point(XYZ.Zero));
-			}
-
 			public void SinglePdfUnderlay()
 			{
 				var definition = new PdfUnderlayDefinition();
@@ -1000,6 +1294,11 @@ namespace ACadSharp.Tests.IO
 				clone.InsertPoint = new XYZ(10, 10, 0);
 
 				this.Document.Entities.Add(clone);
+			}
+
+			public void SinglePoint()
+			{
+				this.Document.Entities.Add(new Point(XYZ.Zero));
 			}
 
 			public void SingleRasterImage()
@@ -1063,6 +1362,22 @@ namespace ACadSharp.Tests.IO
 
 				this.Document.Entities.Add(spline);
 				this.Document.Entities.Add(polyline);
+
+				List<XYZ> fitPoints = new()
+				{
+					new XYZ(0, 0, 0),
+					new XYZ(5, 5, 0),
+					new XYZ(10, 0, 0),
+					new XYZ(15, -5, 0),
+					new XYZ(20, 0, 0)
+				};
+
+				spline = new Spline();
+				spline.FitPoints.AddRange(fitPoints);
+
+				spline.UpdateFromFitPoints();
+
+				this.Document.Entities.Add(spline);
 			}
 
 			public void TextAlignment()
@@ -1141,7 +1456,7 @@ namespace ACadSharp.Tests.IO
 				records.Add(new ExtendedDataInteger16(5));
 				records.Add(new ExtendedDataInteger32(33));
 				records.Add(new ExtendedDataString("my extended data string"));
-				records.Add(new ExtendedDataHandle(5));
+				//records.Add(new ExtendedDataHandle(5));
 				records.Add(new ExtendedDataReal(25.35));
 				records.Add(new ExtendedDataScale(0.66));
 				records.Add(new ExtendedDataDistance(481.48));
@@ -1155,6 +1470,18 @@ namespace ACadSharp.Tests.IO
 				line.ExtendedData.Add(app, records);
 
 				this.Document.Entities.Add(line);
+			}
+
+			public void XRef()
+			{
+				BlockRecord record = new BlockRecord("my_xref", "./SinglePoint_AC1032.dwg");
+				this.Document.BlockRecords.Add(record);
+				this.Document.Entities.Add(new Insert(record));
+
+				record = new BlockRecord("my_line_xref", "./SingleLine_AC1032.dwg");
+				record.IsUnloaded = true;
+				this.Document.BlockRecords.Add(record);
+				this.Document.Entities.Add(new Insert(record));
 			}
 		}
 	}

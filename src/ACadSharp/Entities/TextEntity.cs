@@ -31,11 +31,11 @@ namespace ACadSharp.Entities
 		[DxfCodeValue(40)]
 		public double Height
 		{
-			get => _height;
+			get => this._height;
 			set
 			{
-				if (value < 0)
-					throw new ArgumentOutOfRangeException("Height value cannot be negative.");
+				if (value <= 0)
+					throw new ArgumentOutOfRangeException(nameof(value), value, "The Text height must be greater than zero.");
 				else
 					this._height = value;
 			}
@@ -57,7 +57,7 @@ namespace ACadSharp.Entities
 		/// Mirror flags.
 		/// </summary>
 		[DxfCodeValue(71)]
-		public TextMirrorFlag Mirror { get; set; } = TextMirrorFlag.None;
+		public TextMirrorFlag Mirror { get => this._mirror; set => this._mirror = value; }
 
 		/// <summary>
 		/// Specifies the three-dimensional normal unit vector for the object.
@@ -98,7 +98,7 @@ namespace ACadSharp.Entities
 
 				if (this.Document != null)
 				{
-					this._style = updateTable(value, this.Document.TextStyles);
+					this._style = CadObject.updateCollection(value, this.Document.TextStyles);
 				}
 				else
 				{
@@ -125,7 +125,7 @@ namespace ACadSharp.Entities
 		{
 			get
 			{
-				return _value;
+				return this._value;
 			}
 			set
 			{
@@ -151,8 +151,12 @@ namespace ACadSharp.Entities
 		[DxfCodeValue(DxfReferenceType.Optional, 41)]
 		public double WidthFactor { get; set; } = 1.0;
 
-		private double _height = 0.0;
+		private double _height = 1.0d;
+
+		private TextMirrorFlag _mirror = TextMirrorFlag.None;
+
 		private TextStyle _style = TextStyle.Default;
+
 		private string _value = string.Empty;
 
 		public TextEntity() : base()
@@ -167,9 +171,9 @@ namespace ACadSharp.Entities
 			XYZ newInsert = transform.ApplyTransform(this.InsertPoint);
 			XYZ newNormal = this.transformNormal(transform, this.Normal);
 
-			var transformation = this.getWorldMatrix(transform, Normal, newNormal, out Matrix3 transOW, out Matrix3 transWO);
+			var transformation = this.getWorldMatrix(transform, this.Normal, newNormal, out Matrix3 transOW, out Matrix3 transWO);
 
-			List<XY> uv = applyRotation(
+			List<XY> uv = this.applyRotation(
 				new[]
 				{
 					this.WidthFactor * this.Height * XY.AxisX,
@@ -202,7 +206,7 @@ namespace ACadSharp.Entities
 						newRotation += Math.PI;
 					}
 
-					this.Mirror = this.Mirror.RemoveFlag(TextMirrorFlag.Backward);
+					this._mirror.RemoveFlag(TextMirrorFlag.Backward);
 				}
 				else
 				{
@@ -306,7 +310,7 @@ namespace ACadSharp.Entities
 		{
 			base.AssignDocument(doc);
 
-			this._style = updateTable(this.Style, doc.TextStyles);
+			this._style = CadObject.updateCollection(this.Style, doc.TextStyles);
 
 			doc.DimensionStyles.OnRemove += this.tableOnRemove;
 		}

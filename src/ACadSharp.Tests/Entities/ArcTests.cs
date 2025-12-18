@@ -1,14 +1,30 @@
 ﻿using ACadSharp.Entities;
+using ACadSharp.Extensions;
 using ACadSharp.Tests.Common;
 using CSMath;
 using System;
-using System.Linq;
 using Xunit;
 
 namespace ACadSharp.Tests.Entities
 {
 	public class ArcTests : CommonEntityTests<Arc>
 	{
+		public override void CloneTest()
+		{
+			Arc arc = new Arc();
+			arc.Radius = 5;
+			arc.EndAngle = Math.PI / 2;
+
+			Arc clone = arc.CloneTyped();
+
+			Assert.NotNull(clone);
+			EntityComparator.IsEqual(arc, clone);
+
+			Assert.Equal(arc.Radius, clone.Radius);
+			Assert.Equal(arc.StartAngle, clone.StartAngle);
+			Assert.Equal(arc.EndAngle, clone.EndAngle);
+		}
+
 		[Fact]
 		public void CreateFromBulgeTest()
 		{
@@ -39,7 +55,7 @@ namespace ACadSharp.Tests.Entities
 		}
 
 		[Fact]
-		public void GetBoundingBoxTest()
+		public override void GetBoundingBoxTest()
 		{
 			Arc arc = new Arc();
 			arc.Radius = 5;
@@ -165,6 +181,90 @@ namespace ACadSharp.Tests.Entities
 			v = arc.PolarCoordinateRelativeToCenter(Math.PI / 4);
 
 			AssertUtils.AreEqual<XYZ>(mid, v, "mid point");
+		}
+
+		[Fact]
+		public void PolygonalVertexesIrregularNormalTest()
+		{
+			var arc = new Arc()
+			{
+				StartAngle = 0,
+				EndAngle = Math.PI / (2),
+				Radius = 20,
+				Normal = XYZ.AxisX
+			};
+
+			arc.GetEndVertices(out XYZ start, out XYZ end);
+			var vertices = arc.PolygonalVertexes(3);
+
+			AssertUtils.AreEqual(start, vertices[0]);
+			AssertUtils.AreEqual(end, vertices[2]);
+			AssertUtils.AreEqual(new XYZ(0, 20, 0), vertices[0]);
+			AssertUtils.AreEqual(new XYZ(0, 0, 20), vertices[2]);
+
+			arc = new Arc()
+			{
+				StartAngle = 0,
+				EndAngle = Math.PI / (2),
+				Radius = 20,
+				Normal = XYZ.AxisY
+			};
+
+			arc.GetEndVertices(out start, out end);
+			vertices = arc.PolygonalVertexes(3);
+
+			AssertUtils.AreEqual(start, vertices[0]);
+			AssertUtils.AreEqual(end, vertices[2]);
+			AssertUtils.AreEqual(new XYZ(-20, 0, 0), vertices[0]);
+			AssertUtils.AreEqual(new XYZ(0, 0, 20), vertices[2]);
+
+			arc = new Arc()
+			{
+				StartAngle = 0,
+				EndAngle = Math.PI / (2),
+				Radius = 20,
+				Normal = -XYZ.AxisX
+			};
+
+			arc.GetEndVertices(out start, out end);
+			vertices = arc.PolygonalVertexes(3);
+
+			AssertUtils.AreEqual(start, vertices[0]);
+			AssertUtils.AreEqual(end, vertices[2]);
+			AssertUtils.AreEqual(new XYZ(0, -20, 0), vertices[0]);
+			AssertUtils.AreEqual(new XYZ(0, 0, 20), vertices[2]);
+
+			arc = new Arc()
+			{
+				StartAngle = 0,
+				EndAngle = Math.PI / (2),
+				Radius = 20,
+				Normal = -XYZ.AxisY
+			};
+
+			arc.GetEndVertices(out start, out end);
+			vertices = arc.PolygonalVertexes(3);
+
+			AssertUtils.AreEqual(start, vertices[0]);
+			AssertUtils.AreEqual(end, vertices[2]);
+			AssertUtils.AreEqual(new XYZ(20, 0, 0), vertices[0]);
+			AssertUtils.AreEqual(new XYZ(0, 0, 20), vertices[2]);
+
+			arc = new Arc()
+			{
+				StartAngle = 0,
+				EndAngle = Math.PI / (2),
+				Radius = 20,
+				Normal = -XYZ.AxisZ
+			};
+
+			arc.GetEndVertices(out start, out end);
+			vertices = arc.PolygonalVertexes(3);
+
+			AssertUtils.AreEqual(start, vertices[0]);
+			AssertUtils.AreEqual(end, vertices[2]);
+			AssertUtils.AreEqual(new XYZ(-20, 0, 0), vertices[0]);
+			AssertUtils.AreEqual(new XYZ(0, 20, 0), vertices[2]);
 		}
 
 		[Fact]

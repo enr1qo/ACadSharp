@@ -122,7 +122,7 @@ namespace ACadSharp.IO
 		/// <returns></returns>
 		public static CadDocument Read(string filename, NotificationEventHandler notification = null)
 		{
-			return Read(File.OpenRead(filename), notification);
+			return Read(File.Open(filename, FileMode.Open, FileAccess.Read, FileShare.ReadWrite), notification);
 		}
 
 		/// <inheritdoc/>
@@ -318,7 +318,7 @@ namespace ACadSharp.IO
 		{
 			base.Dispose();
 
-			if (this.Configuration.ClearChache)
+			if (this.Configuration.ClearCache)
 			{
 				DxfMap.ClearCache();
 			}
@@ -533,7 +533,6 @@ namespace ACadSharp.IO
 
 					CodePage code = CadUtils.GetCodePage(encoding.ToLower());
 					this._encoding = this.getListedEncoding((int)code);
-					break;
 				}
 
 				tmpReader.ReadNext();

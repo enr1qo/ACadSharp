@@ -40,6 +40,14 @@ namespace ACadSharp
 		public ColorCollection Colors { get; private set; }
 
 		/// <summary>
+		/// The collection of the system variables in the drawing.
+		/// </summary>
+		/// <remarks>
+		/// The collection is null if the <see cref="CadDictionary.VariableDictionary"/> doesn't exist in the root dictionary.
+		/// </remarks>
+		public DictionaryVariableCollection DictionaryVariables { get; private set; }
+
+		/// <summary>
 		/// The collection of all dimension styles in the drawing.
 		/// </summary>
 		public DimensionStylesTable DimensionStyles { get; private set; }
@@ -76,14 +84,6 @@ namespace ACadSharp
 		public ImageDefinitionCollection ImageDefinitions { get; private set; }
 
 		/// <summary>
-		/// The collection of all images in the drawing.
-		/// </summary>
-		/// <remarks>
-		/// The collection is null if the <see cref="CadDictionary.AcadImageDict"/> doesn't exist in the root dictionary.
-		/// </remarks>
-		public PdfDefinitionCollection PdfDefinitions { get; private set; }
-
-		/// <summary>
 		/// The collection of all layers in the drawing.
 		/// </summary>
 		public LayersTable Layers { get; private set; }
@@ -100,6 +100,14 @@ namespace ACadSharp
 		/// The collection of all line types in the drawing.
 		/// </summary>
 		public LineTypesTable LineTypes { get; private set; }
+
+		/// <summary>
+		/// The collection of all materials in the drawing.
+		/// </summary>
+		/// <remarks>
+		/// The collection is null if the <see cref="CadDictionary.AcadMaterial"/> doesn't exist in the root dictionary.
+		/// </remarks>
+		public MaterialCollection Materials { get; private set; }
 
 		/// <summary>
 		/// The collection of all Multi leader styles in the drawing.
@@ -126,6 +134,14 @@ namespace ACadSharp
 		/// Default paper space of the model
 		/// </summary>
 		public BlockRecord PaperSpace { get { return this.BlockRecords[BlockRecord.PaperSpaceName]; } }
+
+		/// <summary>
+		/// The collection of all images in the drawing.
+		/// </summary>
+		/// <remarks>
+		/// The collection is null if the <see cref="CadDictionary.AcadImageDict"/> doesn't exist in the root dictionary.
+		/// </remarks>
+		public PdfDefinitionCollection PdfDefinitions { get; private set; }
 
 		/// <summary>
 		/// Root dictionary of the document.
@@ -174,6 +190,8 @@ namespace ACadSharp
 		/// </summary>
 		public VPortsTable VPorts { get; private set; }
 
+		internal ViewportEntityControl VEntityControl { get; set; }
+
 		//Contains all the objects in the document
 		private readonly Dictionary<ulong, IHandledCadObject> _cadObjects = new Dictionary<ulong, IHandledCadObject>();
 
@@ -203,28 +221,6 @@ namespace ACadSharp
 			if (createDefaults)
 			{
 				this.CreateDefaults();
-			}
-		}
-
-		/// <summary>
-		/// Updates the <see cref="DxfClass"/> in the document and their instance count.
-		/// </summary>
-		/// <param name="reset">Resets the list and clears any unnecessary classes.</param>
-		public void UpdateDxfClasses(bool reset)
-		{
-			if (reset)
-			{
-				this.Classes.Clear();
-			}
-
-			DxfClassCollection.UpdateDxfClasses(this);
-
-			foreach (var item in this.Classes)
-			{
-				item.InstanceCount = this._cadObjects.Values
-					.OfType<CadObject>()
-					.Where(c => c.ObjectName == item.DxfName)
-					.Count();
 			}
 		}
 
@@ -286,6 +282,7 @@ namespace ACadSharp
 			if (!this.BlockRecords.Contains(BlockRecord.PaperSpaceName))
 			{
 				BlockRecord pspace = BlockRecord.PaperSpace;
+				pspace.Layout.TabOrder = 1;
 				this.Layouts.Add(pspace.Layout);
 			}
 		}
@@ -318,6 +315,42 @@ namespace ACadSharp
 		}
 
 		/// <summary>
+		/// Retrieves the current object of the specified type from the document's configuration.
+		/// </summary>
+		/// <typeparam name="T">The type of the object to retrieve. Must be a type that implements <see cref="CadObject"/> and <see
+		/// cref="INamedCadObject"/>.</typeparam>
+		/// <returns>The current object of the specified type, or throws an exception if the type is not supported.</returns>
+		/// <exception cref="NotSupportedException">Thrown if the specified type <typeparamref name="T"/> is not a configurable type in the document.</exception>
+		public T GetCurrent<T>()
+			where T : CadObject, INamedCadObject
+		{
+			switch (typeof(T))
+			{
+				case Type t when t.Equals(typeof(Layer)):
+					return this.Header.CurrentLayer as T;
+				case Type t when t.Equals(typeof(LineType)):
+					return this.Header.CurrentLineType as T;
+				case Type t when t.Equals(typeof(TextStyle)):
+					return this.Header.CurrentTextStyle as T;
+				case Type t when t.Equals(typeof(DimensionStyle)):
+					return this.Header.CurrentDimensionStyle as T;
+				case Type t when t.Equals(typeof(MLineStyle)):
+					return this.Header.CurrentMLineStyle as T;
+				case Type t when t.Equals(typeof(MultiLeaderStyle)):
+					if (this.DictionaryVariables.TryGet(DictionaryVariable.CurrentMultiLeaderStyle, out DictionaryVariable variable))
+					{
+						if (this.MLeaderStyles.TryGet(variable.Value, out MultiLeaderStyle style))
+						{
+							return style as T;
+						}
+					}
+					return null;
+				default:
+					throw new NotSupportedException($"The type {typeof(T)} is not a configurable type in the document.");
+			}
+		}
+
+		/// <summary>
 		/// Reassign all the handles in the document to avoid the variable <see cref="CadHeader.HandleSeed"/> to grow past its limit.
 		/// </summary>
 		public void RestoreHandles()
@@ -339,6 +372,49 @@ namespace ACadSharp
 			}
 
 			this.Header.HandleSeed = nextHandle;
+		}
+
+		/// <summary>
+		/// This method sets the current configurable object of the specified type in the document's configuration.
+		/// </summary>
+		/// <typeparam name="T"></typeparam>
+		/// <param name="obj"></param>
+		/// <exception cref="NotSupportedException"></exception>
+		public void SetCurrent<T>(T obj)
+			where T : CadObject, INamedCadObject
+		{
+			switch (obj)
+			{
+				case Layer layer:
+					this.Header.CurrentLayerName = this.Layers.TryAdd(layer).Name;
+					break;
+				case LineType lineType:
+					this.Header.CurrentLineTypeName = this.LineTypes.TryAdd(lineType).Name; ;
+					break;
+				case TextStyle textStyle:
+					this.Header.CurrentTextStyleName = this.TextStyles.TryAdd(textStyle).Name;
+					break;
+				case DimensionStyle dimensionStyle:
+					this.Header.CurrentDimensionStyleName = this.DimensionStyles.TryAdd(dimensionStyle).Name;
+					break;
+				case MLineStyle mlineStyle:
+					this.Header.CurrentMLineStyleName = this.MLineStyles.TryAdd(mlineStyle).Name;
+					break;
+				case MultiLeaderStyle multiLeaderStyle:
+					if (this.DictionaryVariables.TryGet(DictionaryVariable.CurrentMultiLeaderStyle, out DictionaryVariable variable))
+					{
+						variable.Value = multiLeaderStyle.Name;
+					}
+					else
+					{
+						variable = new DictionaryVariable(DictionaryVariable.CurrentMultiLeaderStyle, multiLeaderStyle.Name);
+						this.DictionaryVariables.Add(variable);
+					}
+					this.MLeaderStyles.TryAdd(multiLeaderStyle);
+					break;
+				default:
+					throw new NotSupportedException($"The type {typeof(T)} is not a configurable type in the document.");
+			}
 		}
 
 		/// <summary>
@@ -366,7 +442,7 @@ namespace ACadSharp
 		}
 
 		/// <summary>
-		/// Updates the collections in the document and link them to it's dictionary
+		/// Updates the collections in the document and link them to it's dictionary.
 		/// </summary>
 		/// <param name="createDictionaries"></param>
 		public void UpdateCollections(bool createDictionaries)
@@ -419,10 +495,67 @@ namespace ACadSharp
 			{
 				this.Colors = new ColorCollection(colors);
 			}
+
+			if (this.updateCollection(CadDictionary.VariableDictionary, createDictionaries, out CadDictionary variables))
+			{
+				this.DictionaryVariables = new DictionaryVariableCollection(variables);
+			}
+
+			if (this.updateCollection(CadDictionary.AcadMaterial, createDictionaries, out CadDictionary materials))
+			{
+				this.Materials = new MaterialCollection(materials);
+			}
+		}
+
+		/// <summary>
+		/// Updates the <see cref="DxfClass"/> in the document and their instance count.
+		/// </summary>
+		/// <param name="reset">Resets the list and clears any unnecessary classes.</param>
+		public void UpdateDxfClasses(bool reset)
+		{
+			if (reset)
+			{
+				this.Classes.Clear();
+			}
+
+			DxfClassCollection.UpdateDxfClasses(this);
+
+			foreach (var item in this.Classes)
+			{
+				item.InstanceCount = this._cadObjects.Values
+					.OfType<CadObject>()
+					.Where(c => c.ObjectName == item.DxfName)
+					.Count();
+			}
+		}
+
+		/// <summary>
+		/// Updates the image definition reactors for all raster images in the current collection.
+		/// </summary>
+		/// <remarks>
+		/// This method removes existing <see cref="ImageDefinitionReactor"/> instances from the document
+		/// and creates new reactors for each <see cref="RasterImage"/>. The new reactors are associated with their
+		/// corresponding image definitions and added to the document.
+		/// </remarks>
+		public void UpdateImageReactors()
+		{
+			var reactors = this._cadObjects.Values.OfType<ImageDefinitionReactor>().ToList();
+			foreach (var item in reactors)
+			{
+				this._cadObjects.Remove(item.Handle);
+			}
+
+			var rasterImages = this._cadObjects.Values.OfType<RasterImage>().ToList();
+			foreach (RasterImage image in rasterImages)
+			{
+				image.DefinitionReactor = new ImageDefinitionReactor(image);
+				this.addCadObject(image.DefinitionReactor);
+				image.Definition.AddReactor(image.DefinitionReactor);
+			}
 		}
 
 		internal void RegisterCollection<T>(IObservableCadCollection<T> collection)
-			where T : CadObject
+					where T : CadObject
 		{
 			switch (collection)
 			{

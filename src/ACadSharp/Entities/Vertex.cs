@@ -44,7 +44,7 @@ namespace ACadSharp.Entities
 		[DxfCodeValue(10, 20, 30)]
 		public XYZ Location { get; set; } = XYZ.Zero;
 
-		IVector IVertex.Location { get { return this.Location; } }
+		IVector IVertex.Location { get { return this.Location; } set { this.Location = value.Convert<XYZ>(); } }
 
 		/// <summary>
 		/// Default constructor.
@@ -79,6 +79,12 @@ namespace ACadSharp.Entities
 		public override BoundingBox GetBoundingBox()
 		{
 			return new BoundingBox(this.Location);
+		}
+
+		/// <inheritdoc/>
+		public override string ToString()
+		{
+			return $"{this.SubclassMarker}|{this.Location.ToString()}";
 		}
 	}
 }

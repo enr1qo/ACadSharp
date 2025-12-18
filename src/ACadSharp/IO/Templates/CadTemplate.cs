@@ -10,22 +10,43 @@ namespace ACadSharp.IO.Templates
 	{
 		public CadObject CadObject { get; set; }
 
-		public ulong? OwnerHandle { get; set; }
-
-		public ulong? XDictHandle { get; set; }
-
-		public List<ulong> ReactorsHandles { get; set; } = new List<ulong>();
-
 		public Dictionary<ulong, List<ExtendedDataRecord>> EDataTemplate { get; set; } = new();
 
 		public Dictionary<string, List<ExtendedDataRecord>> EDataTemplateByAppName { get; set; } = new();
+
+		public bool HasBeenBuilt { get; private set; } = false;
+
+		public ulong? OwnerHandle { get; set; }
+
+		public HashSet<ulong> ReactorsHandles { get; set; } = new();
+
+		public ulong? XDictHandle { get; set; }
 
 		public CadTemplate(CadObject cadObject)
 		{
 			this.CadObject = cadObject;
 		}
 
-		public virtual void Build(CadDocumentBuilder builder)
+		public void Build(CadDocumentBuilder builder)
+		{
+			if (this.HasBeenBuilt)
+			{
+				return;
+			}
+			else
+			{
+				this.HasBeenBuilt = true;
+			}
+
+			this.build(builder);
+		}
+
+		public override string ToString()
+		{
+			return $"{this.CadObject?.ToString()}";
+		}
+
+		protected virtual void build(CadDocumentBuilder builder)
 		{
 			if (builder.TryGetCadObject(this.XDictHandle, out CadDictionary cadDictionary))
 			{
