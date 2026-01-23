@@ -1,24 +1,25 @@
 ﻿using ACadSharp.Blocks;
 using ACadSharp.Classes;
 using ACadSharp.Entities;
-using ACadSharp.Types.Units;
+using ACadSharp.Exceptions;
 using ACadSharp.IO.Templates;
 using ACadSharp.Objects;
+using ACadSharp.Objects.Evaluations;
 using ACadSharp.Tables;
 using ACadSharp.Tables.Collections;
-using CSMath;
-using System.Collections.Generic;
-using System.Linq;
-using System.IO;
-using System;
-using static ACadSharp.Objects.MultiLeaderObjectContextData;
-using CSUtilities.Converters;
-using System.Globalization;
-using ACadSharp.Objects.Evaluations;
+using ACadSharp.Types.Units;
 using ACadSharp.XData;
+using CSMath;
+using CSUtilities.Converters;
+using System;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Reflection;
 using System.Text;
-using ACadSharp.Exceptions;
+using static ACadSharp.Objects.MultiLeaderObjectContextData;
 
 namespace ACadSharp.IO.DWG
 {
@@ -785,6 +786,9 @@ namespace ACadSharp.IO.DWG
 				case ObjectType.VERTEX_PFACE:
 					template = this.readVertex3D(new VertexFaceMesh());
 					break;
+				case ObjectType.VERTEX_MESH:
+					template = this.readVertex3D(new PolygonMeshVertex());
+					break;
 				case ObjectType.VERTEX_PFACE_FACE:
 					template = this.readPfaceVertex();
 					break;
@@ -982,7 +986,6 @@ namespace ACadSharp.IO.DWG
 					template = this.readOle2Frame();
 					break;
 				//Not implemented entities:
-				case ObjectType.VERTEX_MESH:
 				case ObjectType.OLEFRAME:
 				case ObjectType.DUMMY:
 					template = this.readUnknownEntity(null);
@@ -1112,6 +1115,12 @@ namespace ACadSharp.IO.DWG
 				case "BLOCKFLIPPARAMETER":
 					template = this.readBlockFlipParameter();
 					break;
+				case DxfFileToken.ObjectBlockRepresentationData:
+					template = this.readBlockRepresentationData();
+					break;
+				case DxfFileToken.ObjectBlockGripLocationComponent:
+					template = this.readBlockGripLocationComponent();
+					break;
 				case "BLOCKFLIPACTION":
 					template = this.readBlockFlipAction();
 					break;
@@ -1129,6 +1138,9 @@ namespace ACadSharp.IO.DWG
 					break;
 				case DxfFileToken.ObjectPlotSettings:
 					template = this.readPlotSettings();
+					break;
+				case DxfFileToken.ObjectTableStyle:
+					template = this.readTableStyle();
 					break;
 			}
 
@@ -1211,125 +1223,6 @@ namespace ACadSharp.IO.DWG
 				this._objectReader.ReadBitLong();
 				this._objectReader.ReadBitLong();
 				this._objectReader.ReadBitLong();
-			}
-
-			return template;
-		}
-
-		private void readEvaluationExpression(CadEvaluationExpressionTemplate template)
-		{
-			this.readCommonNonEntityData(template);
-
-			//AcDbEvalExpr
-			var unknown = this._objectReader.ReadBitLong();
-			Debug.Assert(unknown == -1);
-
-			//98
-			template.CadObject.Value98 = this._objectReader.ReadBitLong();
-			//99
-			template.CadObject.Value99 = this._objectReader.ReadBitLong();
-
-			//-9999 always the same value
-			short n9999 = this._mergedReaders.ReadBitShort();
-			Debug.Assert(n9999 == -9999);
-
-			//90
-			template.CadObject.Value90 = this._objectReader.ReadBitLong();
-		}
-
-		private void readBlockElement(CadBlockElementTemplate template)
-		{
-			this.readEvaluationExpression(template);
-
-			//300 name
-			template.BlockElement.ElementName = this._mergedReaders.ReadVariableText();
-			//98
-			template.BlockElement.Value98 = this._mergedReaders.ReadBitLong();
-			//99
-			template.BlockElement.Value99 = this._mergedReaders.ReadBitLong();
-			//1071
-			template.BlockElement.Value1071 = this._mergedReaders.ReadBitLong();
-		}
-
-		private void readBlockParameter(CadBlockParameterTemplate template)
-		{
-			this.readBlockElement(template);
-
-			//280
-			template.BlockParameter.Value280 = this._mergedReaders.ReadBit();
-			//281
-			template.BlockParameter.Value281 = this._mergedReaders.ReadBit();
-		}
-
-		private void readBlock1PtParameter(CadBlock1PtParameterTemplate template)
-		{
-			this.readBlockParameter(template);
-
-			//1010 1020 1030
-			template.Block1PtParameter.Location = this._mergedReaders.Read3BitDouble();
-
-			//170
-			template.Block1PtParameter.Value170 = this._mergedReaders.ReadBitShort();
-			//171
-			template.Block1PtParameter.Value171 = this._mergedReaders.ReadBitShort();
-			//93
-			template.Block1PtParameter.Value93 = this._mergedReaders.ReadBitLong();
-		}
-
-		private CadTemplate readBlockVisibilityParameter()
-		{
-			BlockVisibilityParameter blockVisibilityParameter = new BlockVisibilityParameter();
-			CadBlockVisibilityParameterTemplate template = new CadBlockVisibilityParameterTemplate(blockVisibilityParameter);
-
-			this.readBlock1PtParameter(template);
-
-			//281
-			blockVisibilityParameter.Value281 = this._mergedReaders.ReadBit();
-			//301
-			blockVisibilityParameter.Name = this._mergedReaders.ReadVariableText();
-			//302
-			blockVisibilityParameter.Description = this._mergedReaders.ReadVariableText();
-			//missing bit??	91 should be an int
-			blockVisibilityParameter.Value91 = this._mergedReaders.ReadBit();
-
-			//DXF 93 Total entities count
-			var totalEntitiesCount = this._objectReader.ReadBitLong();
-			for (int i = 0; i < totalEntitiesCount; i++)
-			{
-				//331
-				template.EntityHandles.Add(this.handleReference());
-			}
-
-			//DXF 92 states count
-			var nstates = this._objectReader.ReadBitLong();
-			for (int j = 0; j < nstates; j++)
-			{
-				template.StateTemplates.Add(this.readState());
-			}
-
-			return template;
-		}
-
-		private CadBlockVisibilityParameterTemplate.StateTemplate readState()
-		{
-			CadBlockVisibilityParameterTemplate.StateTemplate template = new CadBlockVisibilityParameterTemplate.StateTemplate();
-
-			template.State.Name = this._textReader.ReadVariableText();
-
-			//DXF 94 subset count 1
-			int n1 = this._objectReader.ReadBitLong();
-			for (int i = 0; i < n1; i++)
-			{
-				//332
-				template.SubSet1.Add(this.handleReference());
-			}
-
-			//DXF 95 subset count 2 
-			var n2 = this._objectReader.ReadBitLong();
-			for (int i = 0; i < n2; i++)
-			{
-				//333
-				template.SubSet2.Add(this.handleReference());
 			}
 
 			return template;
@@ -2630,7 +2523,51 @@ namespace ACadSharp.IO.DWG
 
 		private CadTemplate readPolylineMesh()
 		{
-			return null;
+			PolygonMesh pline = new PolygonMesh();
+			CadPolyLineTemplate template = new CadPolyLineTemplate(pline);
+
+			this.readCommonEntityData(template);
+
+			//Flags BS 70
+			pline.Flags = (PolylineFlags)this._objectReader.ReadBitShort();
+			//Curve type BS 75 Curve and smooth surface type.
+			pline.SmoothSurface = (SmoothSurfaceType)this._objectReader.ReadBitShort();
+			//M vert count BS 71 M vertex count
+			pline.MVertexCount = this._objectReader.ReadBitShort();
+			//N vert count BS 72 N vertex count
+			pline.NVertexCount = this._objectReader.ReadBitShort();
+			//M density BS 73 M vertex count
+			pline.MSmoothSurfaceDensity = this._objectReader.ReadBitShort();
+			//N density BS 74 N vertex count
+			pline.NSmoothSurfaceDensity = this._objectReader.ReadBitShort();
+
+			//R13 - R2000:
+			if (this.R13_15Only)
+			{
+				//H first VERTEX(soft pointer)
+				template.FirstVertexHandle = this.handleReference();
+				//H last VERTEX(soft pointer)
+				template.LastVertexHandle = this.handleReference();
+			}
+
+			//R2004+:
+			if (this.R2004Plus)
+			{
+				//Owned Object Count BL Number of objects owned by this object.
+				int n = this._objectReader.ReadBitLong();
+				for (int i = 0; i < n; i++)
+				{
+					//H[VERTEX(soft pointer)]
+					//Repeats “Owned Object Count” times.
+					template.OwnedObjectsHandlers.Add(this.handleReference());
+				}
+			}
+
+			//Common:
+			//H SEQEND(hard owner)
+			template.SeqendHandle = this.handleReference();
+
+			return template;
 		}
 
 		private CadTemplate readSolid()
@@ -5201,7 +5138,7 @@ namespace ACadSharp.IO.DWG
 				//DIMZIN BS 78
 				dimStyle.ZeroHandling = (ZeroHandling)this._objectReader.ReadBitShort();
 				//DIMAZIN BS 79
-				dimStyle.AngularZeroHandling = (ZeroHandling)this._objectReader.ReadBitShort();
+				dimStyle.AngularZeroHandling = (AngularZeroHandling)this._objectReader.ReadBitShort();
 			}
 
 			//R2007 +:
@@ -6186,9 +6123,9 @@ namespace ACadSharp.IO.DWG
 								//degree BL 94 degree of the spline
 								splineEdge.Degree = this._objectReader.ReadBitLong();
 								//isrational B 73 1 if rational(has weights), else 0
-								splineEdge.Rational = this._objectReader.ReadBit();
+								splineEdge.IsRational = this._objectReader.ReadBit();
 								//isperiodic B 74 1 if periodic, else 0
-								splineEdge.Periodic = this._objectReader.ReadBit();
+								splineEdge.IsPeriodic = this._objectReader.ReadBit();
 
 								//numknots BL 95 number of knots
 								int numknots = this._objectReader.ReadBitLong();
@@ -6205,7 +6142,7 @@ namespace ACadSharp.IO.DWG
 									var cp = this._objectReader.Read2RawDouble();
 
 									double wheight = 0;
-									if (splineEdge.Rational)
+									if (splineEdge.IsRational)
 										//weight BD 40 weight
 										wheight = this._objectReader.ReadBitDouble();
 
@@ -6834,6 +6771,142 @@ namespace ACadSharp.IO.DWG
 			this.readPlotSettings(plotsettings);
 
 			return template;
+		}
+
+		private CadTemplate readTableStyle()
+		{
+			TableStyle style = new TableStyle();
+			CadTableStyleTemplate template = new CadTableStyleTemplate(style);
+
+			this.readCommonNonEntityData(template);
+
+			if (this.R2007Pre)
+			{
+				//TABLESTYLE format until R21
+				//Common:
+				//Description TV 3
+				style.Description = this._mergedReaders.ReadVariableText();
+				//Flow direction BS 70 0 = down, 1 = up
+				style.FlowDirection = (TableFlowDirectionType)this._mergedReaders.ReadBitShort();
+				//Bit flags BS 71 Meaning unknown.
+				style.Flags = this._mergedReaders.ReadBitShort();
+				//Horizontal cell margin BD 40
+				style.HorizontalCellMargin = this._mergedReaders.ReadBitDouble();
+				//Vertical cell margin BD 41
+				style.VerticalCellMargin = this._mergedReaders.ReadBitDouble();
+				//Suppress title B 280
+				style.SuppressTitle = this._mergedReaders.ReadBit();
+				//Suppress header B 281
+				style.SuppressHeaderRow = this._mergedReaders.ReadBit();
+
+				//Begin repeat 3 times (data, title and header row styles in this order)
+				this.readRowCellStyle(template, style.DataCellStyle);
+				this.readRowCellStyle(template, style.TitleCellStyle);
+				this.readRowCellStyle(template, style.HeaderCellStyle);
+
+				return template;
+			}
+
+			//RC - Unknown
+			var rc = this._mergedReaders.ReadByte();
+			//TV 3 Description
+			style.Description = this._mergedReaders.ReadVariableText();
+			//BL - Unknown
+			var bl1 = this._mergedReaders.ReadBitLong();
+			//BL - Unknown
+			var bl2 = this._mergedReaders.ReadBitLong();
+			//H - Unknown(hard owner)
+			var h = this.handleReference();
+
+			//… The cell style with name “Table”, see paragraph 20.4.101.4.
+			var tableCellStyleTemplate = new CadTableEntityTemplate.CadCellStyleTemplate(style.TableCellStyle);
+			this.readCellStyle(tableCellStyleTemplate);
+
+			//BL 90 Cell style ID, 1 = title, 2 = header, 3 = data, 4 = table (new in R24).
+			//The cell style ID is used by cells, columns, rows to reference a cell style in the
+			//table’s table style.Custom cell style ID’s are numbered starting at 101.
+			//TODO: is the same as the cell type??
+			style.TableCellStyle.Id = this._mergedReaders.ReadBitLong();
+			//BL 91 Cell style class, 1= data, 2 = label. The default value is label.
+			style.TableCellStyle.StyleClass = (TableEntity.CellStyleClass)this._mergedReaders.ReadBitLong();
+			//TV 300 Cell style name
+			style.TableCellStyle.Name = this._mergedReaders.ReadVariableText();
+			//BL The number of cell styles (should be 3), the non-custom cell styles are present
+			//only in the CELLSTYLEMAP.
+			int nCellStyles = this._mergedReaders.ReadBitLong();
+			for (int i = 0; i < nCellStyles; i++)
+			{
+				var cellStyle = new TableEntity.CellStyle();
+				var cellStyleTemplate = new CadTableEntityTemplate.CadCellStyleTemplate(cellStyle);
+				template.CellStyleTemplates.Add(cellStyleTemplate);
+
+				//… The cell style fields, see paragraph 20.4.101.4.
+				int unknown = this._mergedReaders.ReadBitLong();
+				this.readCellStyle(cellStyleTemplate);
+
+				//BL - Cell style ID, 1 = title, 2 = header, 3 = data, 4 = table (new in R24).
+				//The cell style ID is used by cells, columns, rows to reference a cell style in the
+				//table’s table style.Custom cell style ID’s are numbered starting at 101.
+				cellStyle.Id = this._mergedReaders.ReadBitLong();
+				//BL - Cell style class, 1= data, 2 = label. The default value is label.
+				cellStyle.StyleClass = (TableEntity.CellStyleClass)this._mergedReaders.ReadBitLong();
+				//TV - Cell style name
+				cellStyle.Name = this._mergedReaders.ReadVariableText();
+			}
+
+			return template;
+		}
+
+		private void readRowCellStyle(CadTableStyleTemplate tableStyleTemplate, TableEntity.CellStyle style)
+		{
+			var cellStyleTemplate = new CadTableEntityTemplate.CadCellStyleTemplate(style);
+
+			tableStyleTemplate.CellStyleTemplates.Add(cellStyleTemplate);
+
+			//Text style ID H 7 Hard pointer.
+			cellStyleTemplate.TextStyleHandle = this.handleReference();
+			//Text height BD 140
+			style.TextHeight = this._mergedReaders.ReadBitDouble();
+			//Text alignment BS 170 Top left = 1, top center = 2, top right = 3, middle
+			//left = 4, middle center = 5, middle right = 6,
+			//bottom left = 7, bottom center = 8, bottom right = 9
+			style.CellAlignment = (TableEntity.Cell.CellAlignmentType)this._mergedReaders.ReadBitShort();
+			//Text color CMC 62
+			style.TextColor = this._mergedReaders.ReadCmColor(this.R2004Pre);
+			//Fill color CMC 63
+			style.BackgroundColor = this._mergedReaders.ReadCmColor(this.R2004Pre);
+			//Background color enabled B 283
+			style.IsFillColorOn = this._mergedReaders.ReadBit();
+
+			// Begin repeat 6 times (borders: top, horizontal inside, bottom, left, vertical inside, right, in Begin repeat 6 times
+			// (borders: top, horizontal inside, bottom, left, vertical inside, right, in this order)
+			this.readBorderStyle(style.TopBorder);
+			this.readBorderStyle(style.HorizontalInsideBorder);
+			this.readBorderStyle(style.BottomBorder);
+			this.readBorderStyle(style.LeftBorder);
+			this.readBorderStyle(style.VerticalInsideBorder);
+			this.readBorderStyle(style.RightBorder);
+
+			//R2007+
+			if (this.R2007Plus)
+			{
+				//Data type BL 90 As defined in the ACAD_TABLE entity.
+				style.ValueDataType = this._mergedReaders.ReadBitLong();
+				//Data unit type BL 91 As defined in the ACAD_TABLE entity.
+				style.ValueUnitType = this._mergedReaders.ReadBitLong();
+				//Format string TV 1
+				style.ValueFormatString = this._mergedReaders.ReadVariableText();
+			}
+		}
+
+		private void readBorderStyle(TableEntity.CellBorder border)
+		{
+			//Line weight BS 274-279
+			border.LineWeight = (LineWeightType)this._mergedReaders.ReadBitShort();
+			//Visible B 284-289 0 = invisible, 1 = visible
+			border.IsInvisible = !this._mergedReaders.ReadBit();
+			//Border color CMC 64-69
+			border.Color = this._mergedReaders.ReadCmColor(this.R2004Pre);
 		}
 
 		private CadTemplate readLayout()

@@ -568,7 +568,9 @@ namespace ACadSharp.IO.DXF
 				case Material:
 				case MultiLeaderObjectContextData:
 				case VisualStyle:
+				case TableStyle:
 				case ProxyObject:
+				case BlockRepresentationData:
 					this.notify($"Object not implemented : {co.GetType().FullName}", NotificationType.NotImplemented);
 					return false;
 				default:

@@ -87,6 +87,9 @@ namespace ACadSharp.IO.DXF
 						case PolyfaceMesh polyfaceMesh:
 							this.writePolyline(polyfaceMesh);
 							break;
+						case PolygonMesh polygonMesh:
+							this.writePolyline(polygonMesh);
+							break;
 						default:
 							throw new NotImplementedException($"Polyline not implemented {polyline.GetType().FullName}");
 					}
@@ -518,8 +521,8 @@ namespace ACadSharp.IO.DXF
 					}
 					break;
 				case Hatch.BoundaryPath.Spline spline:
-					this._writer.Write(73, spline.Rational ? (short)1 : (short)0);
-					this._writer.Write(74, spline.Periodic ? (short)1 : (short)0);
+					this._writer.Write(73, spline.IsRational ? (short)1 : (short)0);
+					this._writer.Write(74, spline.IsPeriodic ? (short)1 : (short)0);
 
 					this._writer.Write(94, (int)spline.Degree);
 					this._writer.Write(95, spline.Knots.Count);
@@ -534,7 +537,7 @@ namespace ACadSharp.IO.DXF
 					{
 						this._writer.Write(10, point.X);
 						this._writer.Write(20, point.Y);
-						if (spline.Rational)
+						if (spline.IsRational)
 						{
 							this._writer.Write(42, point.Z);
 						}
@@ -1040,6 +1043,9 @@ namespace ACadSharp.IO.DXF
 				case PolyfaceMesh:
 					map = DxfClassMap.Create<PolyfaceMesh>();
 					break;
+				case PolygonMesh:
+					map = DxfClassMap.Create<PolygonMesh>();
+					break;
 				default:
 					throw new NotImplementedException($"Polyline not implemented {polyline.GetType().FullName}");
 			}
@@ -1052,6 +1058,14 @@ namespace ACadSharp.IO.DXF
 
 			this._writer.Write(70, (short)polyline.Flags, map);
 			this._writer.Write(75, (short)polyline.SmoothSurface, map);
+
+			if (polyline is PolygonMesh polygon)
+			{
+				this._writer.WriteIfNotDefault(71, polygon.MVertexCount, 0, map);
+				this._writer.WriteIfNotDefault(72, polygon.MVertexCount, 0, map);
+				this._writer.WriteIfNotDefault(73, polygon.MSmoothSurfaceDensity, 0, map);
+				this._writer.WriteIfNotDefault(74, polygon.NSmoothSurfaceDensity, 0, map);
+			}
 
 			this._writer.Write(210, polyline.Normal, map);
 

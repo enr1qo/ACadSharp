@@ -42,15 +42,15 @@
 
 		public const string BlockGrip = "AcDbBlockGrip";
 
-		public const string BlockGripExpression = "AcDbBlockGripExpression";
-
-		public const string BlockGripLocationComponent = "AcDbBlockGripLocationComponent";
+		public const string BlockGripExpression = "AcDbBlockGripExpr";
 
 		public const string BlockLinearParameter = "AcDbBlockLinearParameter";
 
 		public const string BlockParameter = "AcDbBlockParameter";
 
 		public const string BlockRecord = "AcDbBlockTableRecord";
+
+		public const string BlockRepresentationData = "AcDbBlockRepresentationData";
 
 		public const string BlockVisibilityGrip = "AcDbBlockVisibilityGrip";
 
@@ -116,6 +116,8 @@
 
 		public const string LinkedData = "AcDbLinkedData";
 
+		public const string LinkedTableData = "AcDbLinkedTableData";
+
 		public const string LwPolyline = "AcDbPolyline";
 
 		public const string Material = "AcDbMaterial";
@@ -157,6 +159,10 @@
 		public const string PolyfaceMeshFace = "AcDbFaceRecord";
 
 		public const string PolyfaceMeshVertex = "AcDbPolyFaceMeshVertex";
+
+		public const string PolygonMesh = "AcDbPolygonMesh";
+
+		public const string PolygonMeshVertex = "AcDbPolygonMeshVertex";
 
 		public const string Polyline = "AcDb2dPolyline";
 
@@ -201,8 +207,6 @@
 		public const string TableContent = "AcDbTableContent";
 
 		public const string TableEntity = "AcDbTable";
-
-		public const string LinkedTableData = "AcDbLinkedTableData";
 
 		public const string TableRecord = "AcDbSymbolTableRecord";
 

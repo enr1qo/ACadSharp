@@ -142,7 +142,7 @@ namespace ACadSharp.IO.DXF
 					this.readExtendedData(template.EDataTemplateByAppName);
 					break;
 				default:
-					this._builder.Notify($"[{template.CadObject.SubclassMarker}] Unhandled dxf code {this._reader.Code} with value {this._reader.ValueAsString}", NotificationType.None);
+					this._builder.Notify($"[{this.currentSubclass}] Unhandled dxf code {this._reader.Code} with value {this._reader.ValueAsString}", NotificationType.None);
 					break;
 			}
 		}
@@ -197,6 +197,7 @@ namespace ACadSharp.IO.DXF
 					return this.readEntityCodes<Ray>(new CadEntityTemplate<Ray>(), this.readEntitySubclassMap);
 				case DxfFileToken.EndSequence:
 					return this.readEntityCodes<Seqend>(new CadEntityTemplate<Seqend>(), this.readEntitySubclassMap);
+				case DxfFileToken.EntityTrace:
 				case DxfFileToken.EntitySolid:
 					return this.readEntityCodes<Solid>(new CadEntityTemplate<Solid>(), this.readModelerGeometry);
 				case DxfFileToken.EntityTable:
@@ -319,6 +320,7 @@ namespace ACadSharp.IO.DXF
 			}
 		}
 
+		[Obsolete("use lockpointer instead")]
 		protected bool checkObjectEnd(CadTemplate template, DxfMap map, Func<CadTemplate, DxfMap, bool> func)
 		{
 			if (this._reader.DxfCode == DxfCode.Start)
@@ -937,14 +939,6 @@ namespace ACadSharp.IO.DXF
 				case 20:
 				//Obsolete; formerly an “entities follow flag” (optional; ignore if present)
 				case 66:
-				//Polygon mesh M vertex count (optional; default = 0)
-				case 71:
-				//Polygon mesh N vertex count(optional; default = 0)
-				case 72:
-				//Smooth surface M density(optional; default = 0)
-				case 73:
-				//Smooth surface N density (optional; default = 0)
-				case 74:
 					return true;
 				case 100:
 					switch (this._reader.ValueAsString)
@@ -960,6 +954,10 @@ namespace ACadSharp.IO.DXF
 						case DxfSubclassMarker.PolyfaceMesh:
 							tmp.SetPolyLineObject(new PolyfaceMesh());
 							map.SubClasses.Add(DxfSubclassMarker.PolyfaceMesh, DxfClassMap.Create<PolyfaceMesh>());
+							return true;
+						case DxfSubclassMarker.PolygonMesh:
+							tmp.SetPolyLineObject(new PolygonMesh());
+							map.SubClasses.Add(DxfSubclassMarker.PolygonMesh, DxfClassMap.Create<PolygonMesh>());
 							return true;
 						default:
 							return false;
@@ -1545,6 +1543,10 @@ namespace ACadSharp.IO.DXF
 							tmp.SetVertexObject(new VertexFaceRecord());
 							map.SubClasses.Add(DxfSubclassMarker.PolyfaceMeshFace, DxfClassMap.Create<VertexFaceRecord>());
 							return true;
+						case DxfSubclassMarker.PolygonMeshVertex:
+							tmp.SetVertexObject(new PolygonMeshVertex());
+							map.SubClasses.Add(DxfSubclassMarker.PolygonMeshVertex, DxfClassMap.Create<PolygonMeshVertex>());
+							return true;
 						default:
 							return false;
 					}
@@ -2057,10 +2059,10 @@ namespace ACadSharp.IO.DXF
 								spline.Degree = this._reader.ValueAsInt;
 								break;
 							case 73:
-								spline.Rational = this._reader.ValueAsBool;
+								spline.IsRational = this._reader.ValueAsBool;
 								break;
 							case 74:
-								spline.Periodic = this._reader.ValueAsBool;
+								spline.IsPeriodic = this._reader.ValueAsBool;
 								break;
 							case 95:
 								nKnots = this._reader.ValueAsInt;
